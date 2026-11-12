@@ -1630,6 +1630,9 @@ export function executeTreeWithDone(
     context.ctx.auditReport = {
       globalsAccess: new Set(),
       prototypeAccess: {},
+      consoleCalls: [],
+      timerCalls: [],
+      quotaExceeded: false,
     };
   }
   if (exec === execSync) {

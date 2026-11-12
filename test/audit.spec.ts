@@ -163,4 +163,81 @@ describe('Sandbox.audit Tests', () => {
       expect(result.result).toBe('Hello, World!');
     });
   });
+
+  describe('Side-effect-free audit profile', () => {
+    it('should not write to the host console', () => {
+      const spy = jest.spyOn(console, 'log').mockImplementation(() => {});
+      try {
+        const result = Sandbox.audit<number>('console.log("hello from sandbox"); return 1');
+        expect(result.result).toBe(1);
+        expect(spy).not.toHaveBeenCalled();
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
+    it('should record console calls in the audit report', () => {
+      const result = Sandbox.audit<number>('console.log("a", 1); console.warn("b"); return 2');
+      expect(result.result).toBe(2);
+      expect(result.auditReport?.consoleCalls).toEqual([
+        { method: 'log', args: ['a', 1] },
+        { method: 'warn', args: ['b'] },
+      ]);
+    });
+
+    it('should not schedule real timers', async () => {
+      const result = Sandbox.audit<string>(
+        'setTimeout(() => { throw new Error("timer must not run"); }, 0); return "done"',
+      );
+      expect(result.result).toBe('done');
+      // If a real timer had been scheduled, it would throw an uncaught error here.
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+
+    it('should record timer calls in the audit report', () => {
+      const result = Sandbox.audit<number>(
+        'const t = setTimeout(() => {}, 100); const i = setInterval(() => {}, 200); clearTimeout(t); clearInterval(i); return t',
+      );
+      expect(result.result).toBe(1);
+      expect(result.auditReport?.timerCalls).toEqual([
+        { type: 'setTimeout', handle: 1, timeout: 100 },
+        { type: 'setInterval', handle: 2, timeout: 200 },
+        { type: 'clearTimeout', handle: 1 },
+        { type: 'clearInterval', handle: 2 },
+      ]);
+    });
+  });
+
+  describe('Audit execution budget', () => {
+    it('should return a structured quota-exceeded report instead of throwing', () => {
+      const result = Sandbox.audit('while (true) {}', [], { executionQuota: 1000n });
+      expect(result.auditReport?.quotaExceeded).toBe(true);
+      expect(result.result).toBeUndefined();
+    });
+
+    it('should apply a default execution quota', () => {
+      expect(Sandbox.DEFAULT_AUDIT_EXECUTION_QUOTA).toBeDefined();
+      const code = 'let s = 0; for (let i = 0; i < 100; i++) s += i; return s';
+      const result = Sandbox.audit<number>(code);
+      expect(result.result).toBe(4950);
+      expect(result.auditReport?.quotaExceeded).toBe(false);
+    });
+
+    it('should still throw runtime errors that are not quota related', () => {
+      const run = () => Sandbox.audit('throw new Error("boom")', [], { executionQuota: 1000n });
+      expect(run).toThrow('boom');
+    });
+  });
+
+  describe('Audit capability reporting', () => {
+    it('should report accessed globals', () => {
+      const result = Sandbox.audit<number>('return Math.max(1, 2)');
+      expect(result.auditReport?.globalsAccess.has('Math')).toBe(true);
+    });
+
+    it('should report prototype access', () => {
+      const result = Sandbox.audit<string>('return "abc".toUpperCase()');
+      expect(result.auditReport?.prototypeAccess['String'].has('toUpperCase')).toBe(true);
+    });
+  });
 });

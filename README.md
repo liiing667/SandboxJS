@@ -38,7 +38,7 @@ This means that you can potentially give different libraries different permissio
 
 Additionaly, `eval` and `Function` are sandboxed as well, and can be used recursively safely, which is why they are considered safe globals in SandboxJS.
 
-There is an `audit` method that will return all the accessed functions and prototypes during runtime if you need to know what permissions to give a certain library.
+There is an `audit` method that will return all the accessed functions and prototypes during runtime if you need to know what permissions to give a certain library. Audit runs are budgeted (a default execution quota, overridable via the `executionQuota` option) and side-effect free: `console` and the timer functions are replaced with inert stubs that record calls into the audit report (`consoleCalls`, `timerCalls`) instead of touching the host, and exceeding the quota returns a report with `quotaExceeded: true` instead of throwing.
 
 Since parsing and executing are separated, execution with SandboxJS can be sometimes even faster than `eval`, allowing to prepare the execution code ahead of time.
 

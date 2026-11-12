@@ -64,6 +64,20 @@ export interface IContext {
 export interface IAuditReport {
   globalsAccess: Set<unknown>;
   prototypeAccess: { [name: string]: Set<PropertyKey> };
+  consoleCalls: IAuditConsoleCall[];
+  timerCalls: IAuditTimerCall[];
+  quotaExceeded: boolean;
+}
+
+export interface IAuditConsoleCall {
+  method: string;
+  args: unknown[];
+}
+
+export interface IAuditTimerCall {
+  type: 'setTimeout' | 'setInterval' | 'clearTimeout' | 'clearInterval';
+  handle?: number;
+  timeout?: number;
 }
 
 export interface Ticks {
